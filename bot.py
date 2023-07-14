@@ -263,7 +263,7 @@ async def mu_chart(ctx, arg=""):
                     mu_strs.append(s)
                     s=""
                 s += (characters[char] + " ")
-            s = s[0:len(s)-1]
+            s = s[0:len(s)-1] + ","
             mu_strs.append(s)
         time_str = most_recent.strftime("%B %d, %Y")
         await ctx.send("Matchup chart for " + characters[arg] + " based on data from " + time_str + ":")
