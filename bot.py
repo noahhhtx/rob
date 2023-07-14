@@ -259,6 +259,9 @@ async def mu_chart(ctx, arg=""):
             s = ""
             s += (i + ": ")
             for char in mus[i]:
+                if len(s + characters[char]) >= 2000:
+                    mu_strs.append(s)
+                    s=""
                 s += (characters[char] + " ")
             s = s[0:len(s)-1]
             mu_strs.append(s)
@@ -285,7 +288,7 @@ async def tier_list(ctx):
         s = ""
         s += (tier + ": ")
         for char in tiers[tier]:
-            if len(s + char[0] + " ") >= 2000:
+            if len(s + char[0]) >= 2000:
                 tier_strs.append(s)
                 s=""
             s += (char[0] + " ")
