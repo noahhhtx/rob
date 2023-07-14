@@ -285,6 +285,9 @@ async def tier_list(ctx):
         s = ""
         s += (tier + ": ")
         for char in tiers[tier]:
+            if len(s + char[0] + " ") >= 2000:
+                tier_strs.append(s)
+                s=""
             s += (char[0] + " ")
         s = s[0:len(s)-1]
         tier_strs.append(s)
