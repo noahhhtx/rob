@@ -107,6 +107,7 @@ most_recent = date.today()
 
 datestr = str(most_recent.strftime("v%Y.%m.%d"))
 url = "https://github.com/smashdata/ThePlayerDatabase/releases/download/" + datestr + "/ultimate_player_database.zip"
+
 r = requests.get(url, allow_redirects=True)
 while r.status_code != 200:
     most_recent = most_recent - timedelta(days=1)
@@ -120,13 +121,6 @@ print("extracting file...")
 
 with ZipFile("smashdata.zip",'r') as obj:
     obj.extractall()
-
-'''
-print("Matchup chart based on data from", most_recent.strftime("%B %d, %Y"))
-
-for key in mus:
-    print(key, mus[key])
-'''
 
 tiers = {"S":[], "A":[], "B":[], "C":[], "D":[], "E":[], "F":[]}
 character_mus = {}
@@ -235,6 +229,7 @@ for character in characters:
                     (tiers[tier])[j] = (tiers[tier])[j+1]
                     (tiers[tier])[j+1] = temp
 
+
 load_dotenv()
 client = commands.Bot(command_prefix="rob!",intents=discord.Intents.all())
 TOKEN = os.getenv('DISCORD_TOKEN')
@@ -303,9 +298,14 @@ async def update():
     today = date.today()
     new_datestr = str(today.strftime("v%Y.%m.%d"))
     new_url = "https://github.com/smashdata/ThePlayerDatabase/releases/download/" + new_datestr + "/ultimate_player_database.zip"
-    if (requests.get(new_url, allow_redirects=True).status_code == 200) and (url != new_url):
-        print("new version found! restarting...")
-        os.execv(__file__, sys.argv)
+    while (new_url != url) and (requests.get(new_url, allow_redirects=True).status_code != 200):
+        print("testing", new_datestr)
+        today = today - timedelta(days=1)
+        new_datestr = str(today.strftime("v%Y.%m.%d"))
+        new_url = "https://github.com/smashdata/ThePlayerDatabase/releases/download/" + new_datestr + "/ultimate_player_database.zip"
+    if new_url != url:
+        print("update found! restarting...")
+        os.execv(sys.executable, ['python'] + sys.argv)
     else:
         print("not yet...")
 
