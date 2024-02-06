@@ -99,140 +99,189 @@ characters = {
         "zerosuitsamus": "<:zerosuitsamus:1128879907485786253>"
     }
 
+def correct(s):
+    x = s
+    return (x.replace(" ", "").replace("&", "and").replace("-","").replace(".","")).lower()
+    
+
 #https://github.com/smashdata/ThePlayerDatabase/releases/download/v2023.07.09/ultimate_player_database.zip
 
-print("searching for file...")
+def calculate(new_file=None):
+    print("searching for file...")
 
-most_recent = date.today()
+    most_recent = date.today()
 
-datestr = str(most_recent.strftime("v%Y.%m.%d"))
-url = "https://github.com/smashdata/ThePlayerDatabase/releases/download/" + datestr + "/ultimate_player_database.zip"
-
-r = requests.get(url, allow_redirects=True)
-while r.status_code != 200:
-    most_recent = most_recent - timedelta(days=1)
     datestr = str(most_recent.strftime("v%Y.%m.%d"))
     url = "https://github.com/smashdata/ThePlayerDatabase/releases/download/" + datestr + "/ultimate_player_database.zip"
-    r = requests.get(url, allow_redirects=True)
 
-open('smashdata.zip', 'wb').write(r.content)
+    r = None
 
-print("extracting file...")
-
-with ZipFile("smashdata.zip",'r') as obj:
-    obj.extractall()
-
-tiers = {"S":[], "A":[], "B":[], "C":[], "D":[], "E":[], "F":[]}
-character_mus = {}
-
-print("calculating matchup charts and tier lists...")
-
-for character in characters:
-
-    print("character:", character)
-
-    mus = { "-3": [], "-2": [], "-1": [], "0": [], "+1": [], "+2": [], "+3": []}
-    
-    con = sqlite3.connect("ultimate_player_database/ultimate_player_database.db")
+    if new_file is None:
+        r = requests.get(url, allow_redirects=True)
+        while r.status_code != 200:
+            most_recent = most_recent - timedelta(days=1)
+            datestr = str(most_recent.strftime("v%Y.%m.%d"))
+            url = "https://github.com/smashdata/ThePlayerDatabase/releases/download/" + datestr + "/ultimate_player_database.zip"
+            r = requests.get(url, allow_redirects=True)
+    else:
+        r = new_file
         
-    df = pd.read_sql_query("SELECT game_data FROM sets WHERE instr(game_data, '" + character + "') > 0", con)
-        
-    wins = {}
-    total_games = {}
-        
-    mu_score = 0
-    counter = 0
-        
-    for index, row in df.iterrows():
-        s = row['game_data']
-        s = s[1:len(s)-1]
-        s = s.replace("{", "")
-        s = s.replace("ultimate/", "")
-        s = s.replace('"', "")
-        games = s.split("}, ")
-        for game in games:
-            loser_char = game[game.find(" ",game.find("loser_char:"))+1:game.find(",",game.find("loser_char:"))]
-            winner_char = game[game.find(" ",game.find("winner_char:"))+1:game.find(",",game.find("winner_char:"))]
-            if (winner_char == character or loser_char == character) and (winner_char != loser_char): #prevent ditto matches from being recorded since that's nonsense...
-                #print("Winner:",winner_char)
-                #print("Loser:",loser_char)
-                #print()
-                if winner_char == character: # record a win for g&w
-                    if loser_char not in total_games:
-                        total_games[loser_char] = 1
-                        wins[loser_char] = 1
-                    else:
-                        total_games[loser_char] += 1
-                        wins[loser_char] += 1
-                else: # record a game played, but not a win
-                    if winner_char not in total_games:
-                        total_games[winner_char] = 1
-                        wins[winner_char] = 0
-                    else:
-                        total_games[winner_char] += 1
-                        
-    con.close()
-        
-    for key in wins:
-        if key == "null" or key == "random":
-            continue
-        counter+=1
-        mu_percent = wins[key]/total_games[key]
-        if mu_percent > 0.49 and mu_percent < 0.51:
-            mu_score+=0
-            mus["0"].append(key)
-        elif mu_percent >= 0.51 and mu_percent <= 0.6:
-            mu_score+=1
-            mus["+1"].append(key)
-        elif mu_percent > 0.6 and mu_percent <= 0.7:
-            mu_score+=2
-            mus["+2"].append(key)
-        elif mu_percent > 0.7:
-            mu_score+=3
-            mus["+3"].append(key)
-        elif (1-mu_percent) >= 0.51 and (1-mu_percent) <= 0.6:
-            mu_score-=1
-            mus["-1"].append(key)
-        elif (1-mu_percent) > 0.6 and (1-mu_percent) <= 0.7:
-            mu_score-=2
-            mus["-2"].append(key)
-        elif (1-mu_percent) > 0.7:
-            mu_score-=3
-            mus["-3"].append(key)
 
-    character_mus[character] = mus
+    open('smashdata.zip', 'wb').write(r.content)
 
-    mu_score = 1.0 * mu_score / counter
-    charstr = (characters[character] + " ")
+    print("URL is",url)
 
-    if mu_score > 1:
-        tiers["S"].append((characters[character], mu_score))
-    elif mu_score < -1:
-        tiers["F"].append((characters[character], mu_score))
-    elif mu_score > 0.6 and mu_score <= 1:
-        tiers["A"].append((characters[character], mu_score))
-    elif mu_score > 0.2 and mu_score <= 0.6:
-        tiers["B"].append((characters[character], mu_score))
-    elif mu_score > -0.2 and mu_score <= 0.2:
-        tiers["C"].append((characters[character], mu_score))
-    elif mu_score > -0.6 and mu_score <= -0.2:
-        tiers["D"].append((characters[character], mu_score))
-    elif mu_score >= -1 and mu_score <= -0.6:
-        tiers["E"].append((characters[character], mu_score))
+    print("extracting file...")
 
-    for tier in tiers:
-        l = len(tiers[tier])
-        for i in range(0,l):
-            for j in range(0,l-i-1):
-                if (tiers[tier])[j][1] < (tiers[tier])[j+1][1]:
-                    temp = (tiers[tier])[j]
-                    (tiers[tier])[j] = (tiers[tier])[j+1]
-                    (tiers[tier])[j+1] = temp
+    with ZipFile("smashdata.zip",'r') as obj:
+        obj.extractall()
+
+    tiers = {"S":[], "A":[], "B":[], "C":[], "D":[], "E":[], "F":[]}
+    best_mus = {}
+    worst_mus = {}
+    character_winrates = {}
+    character_mus = {}
+    character_games_recorded = {}
+
+    print("calculating matchup charts and tier lists...")
+
+    for character in characters:
+
+        char_str = character
+
+        print("character:", character)
+
+        winrates = {}
+
+        mus = { "-3": [], "-2": [], "-1": [], "0": [], "+1": [], "+2": [], "+3": []}
+        
+        con = sqlite3.connect("ultimate_player_database/ultimate_player_database.db")
+            
+        df = pd.read_sql_query("SELECT game_data FROM sets WHERE instr(game_data, '" + character + "') > 0", con)
+            
+        wins = {}
+        total_games = {}
+            
+        mu_score = 0
+        counter = 0
+            
+        for index, row in df.iterrows():
+            s = row['game_data']
+            s = s[1:len(s)-1]
+            s = s.replace("{", "")
+            s = s.replace("ultimate/", "")
+            s = s.replace('"', "")
+            games = s.split("}, ")
+            for game in games:
+                loser_char = game[game.find(" ",game.find("loser_char:"))+1:game.find(",",game.find("loser_char:"))]
+                winner_char = game[game.find(" ",game.find("winner_char:"))+1:game.find(",",game.find("winner_char:"))]
+                if (winner_char == character or loser_char == character) and (winner_char != loser_char): #prevent ditto matches from being recorded since that's nonsense...
+                    #print("Winner:",winner_char)
+                    #print("Loser:",loser_char)
+                    #print()
+                    if winner_char == character: # record a win for g&w
+                        if loser_char not in total_games:
+                            total_games[loser_char] = 1
+                            wins[loser_char] = 1
+                        else:
+                            total_games[loser_char] += 1
+                            wins[loser_char] += 1
+                    else: # record a game played, but not a win
+                        if winner_char not in total_games:
+                            total_games[winner_char] = 1
+                            wins[winner_char] = 0
+                        else:
+                            total_games[winner_char] += 1
+                            
+        con.close()
+
+        character_games_recorded[character] = (total_games,wins)
+            
+        for key in wins:
+            if key == "null" or key == "random":
+                continue
+            counter+=1
+            mu_percent = wins[key]/total_games[key]
+            winrates[key] = mu_percent
+            if mu_percent > 0.49 and mu_percent < 0.51:
+                mu_score+=0
+                mus["0"].append(key)
+            elif mu_percent >= 0.51 and mu_percent <= 0.6:
+                mu_score+=1
+                mus["+1"].append(key)
+            elif mu_percent > 0.6 and mu_percent <= 0.7:
+                mu_score+=2
+                mus["+2"].append(key)
+            elif mu_percent > 0.7:
+                mu_score+=3
+                mus["+3"].append(key)
+            elif (1-mu_percent) >= 0.51 and (1-mu_percent) <= 0.6:
+                mu_score-=1
+                mus["-1"].append(key)
+            elif (1-mu_percent) > 0.6 and (1-mu_percent) <= 0.7:
+                mu_score-=2
+                mus["-2"].append(key)
+            elif (1-mu_percent) > 0.7:
+                mu_score-=3
+                mus["-3"].append(key)
+
+        character_mus[character] = mus
+        character_winrates[character] = winrates
+        
+        best_win = max(winrates.values())
+        best_char = list(winrates.keys())[list(winrates.values()).index(best_win)]
+
+        best_mus[character] = (best_char, best_win)
+        
+        worst_win = min(winrates.values())
+        worst_char = list(winrates.keys())[list(winrates.values()).index(worst_win)]
+
+        worst_mus[character] = (worst_char, worst_win)    
+
+        mu_score = 1.0 * mu_score / counter
+        charstr = (characters[character] + " ")
+
+        if mu_score > 1:
+            tiers["S"].append((characters[character], mu_score))
+        elif mu_score < -1:
+            tiers["F"].append((characters[character], mu_score))
+        elif mu_score > 0.6 and mu_score <= 1:
+            tiers["A"].append((characters[character], mu_score))
+        elif mu_score > 0.2 and mu_score <= 0.6:
+            tiers["B"].append((characters[character], mu_score))
+        elif mu_score > -0.2 and mu_score <= 0.2:
+            tiers["C"].append((characters[character], mu_score))
+        elif mu_score > -0.6 and mu_score <= -0.2:
+            tiers["D"].append((characters[character], mu_score))
+        elif mu_score >= -1 and mu_score <= -0.6:
+            tiers["E"].append((characters[character], mu_score))
+
+        for tier in tiers:
+            l = len(tiers[tier])
+            for i in range(0,l):
+                for j in range(0,l-i-1):
+                    if (tiers[tier])[j][1] < (tiers[tier])[j+1][1]:
+                        temp = (tiers[tier])[j]
+                        (tiers[tier])[j] = (tiers[tier])[j+1]
+                        (tiers[tier])[j+1] = temp
+
+    return (tiers, character_mus, character_games_recorded, best_mus, worst_mus, most_recent, url, character_winrates)
 
 
 load_dotenv()
 client = commands.Bot(command_prefix="rob!",intents=discord.Intents.all())
 TOKEN = os.getenv('DISCORD_TOKEN')
+
+initial_calculations = calculate()
+
+tiers = initial_calculations[0]
+character_mus = initial_calculations[1]
+character_games_recorded = initial_calculations[2]
+best_mus = initial_calculations[3]
+worst_mus = initial_calculations[4]
+most_recent = initial_calculations[5]
+url = initial_calculations[6]
+character_winrates = initial_calculations[7]
 
 @client.event
 async def on_ready():
@@ -242,28 +291,31 @@ async def on_ready():
 @client.command(name = 'mu_chart', brief='Displays the matchup chart.', description='Displays the matchup chart.')
 async def mu_chart(ctx, arg=""):
     print("Matchup chart requested.")
+    arg = correct(arg)
     if arg=="" or arg not in characters:
         await ctx.send("ERROR: Invalid argument. Type rob!chars for a list of accepted arguments.")
+    elif character_mus is None or best_mus is None or worst_mus is None:
+        await ctx.send("ERROR: Matchup chart is currently being calculated. Try again later.")
     else:
+        s = ""
+        time_str = most_recent.strftime("%B %d, %Y")
+        titl="Matchup chart for " + characters[arg] + " based on data from " + time_str
         mus = character_mus[arg]
-        mu_strs = []
         chars_used = 0
         for i in mus:
             if len(mus[i]) == 0:
                 continue
-            s = ""
-            s += (i + ": ")
+            s+=(i+": ")
             for char in mus[i]:
-                if len(s + characters[char]) >= 2000:
-                    mu_strs.append(s)
-                    s=""
                 s += (characters[char] + " ")
-            s = s[0:len(s)-1] + ","
-            mu_strs.append(s)
-        time_str = most_recent.strftime("%B %d, %Y")
-        await ctx.send("Matchup chart for " + characters[arg] + " based on data from " + time_str + ":")
-        for line in mu_strs:
-            await ctx.send(line)
+            s+="\n"
+        embed=discord.Embed(title=titl,description=s)
+        best = characters[best_mus[arg][0]] + " (Win Rate: %.2f percent)" % (best_mus[arg][1] * 100)
+        embed.add_field(name="Best Matchup",value=best,inline=False)
+        worst = characters[worst_mus[arg][0]] + " (Win Rate: %.2f percent)" % (worst_mus[arg][1] * 100)
+        embed.add_field(name="Worst Matchup",value=worst,inline=False)
+        await ctx.send(embed=embed)
+        
 
 @client.command(name = 'chars', brief='Displays all characters.', description='Displays all characters.')
 async def chars(ctx, arg=""):
@@ -275,38 +327,72 @@ async def chars(ctx, arg=""):
 
 @client.command(name = 'tier_list', brief='Calculates a tier list.', description='Calculates a tier list.')
 async def tier_list(ctx):
-    time_str = most_recent.strftime("%B %d, %Y")
-    tier_strs = []
-    for tier in tiers:
-        if len(tiers[tier]) == 0:
-            continue
+    if tiers is None:
+        await ctx.send("ERROR: Tier list is currently being calculated. Try again later.")
+    else:
         s = ""
-        s += (tier + ": ")
-        for char in tiers[tier]:
-            if len(s + char[0]) >= 2000:
-                tier_strs.append(s)
-                s=""
-            s += (char[0] + " ")
-        s = s[0:len(s)-1] + ","
-        tier_strs.append(s)
-    await ctx.send("Tier list based on data from " + time_str + ":")
-    for s in tier_strs:
-        await ctx.send(s)
+        time_str = most_recent.strftime("%B %d, %Y")
+        titl="Tier list based on data from " + time_str + ":"
+        for tier in tiers:
+            if len(tiers[tier]) == 0:
+                continue
+            s += (tier+": ")
+            for char in tiers[tier]:
+                s += (char[0] + " ")
+            s+="\n"
+        embed=discord.Embed(title=titl,description=s)
+        await ctx.send(embed=embed)
 
-@tasks.loop(hours = 24)
+@client.command(name = 'matchup', brief='Shows a specific matchup.', description='Shows a specific matchup.')
+async def matchup(ctx, *args):
+    if len(args) != 2:
+        await ctx.send("ERROR: Invalid argument amount. Provide only two arguments.")
+    elif character_games_recorded is None:
+        await ctx.send("ERROR: Data is currently being calculated. Try again later.")
+    else:
+        char_1 = correct(args[0])
+        char_2 = correct(args[1])
+        if char_1 not in characters or char_2 not in characters:
+            await ctx.send("ERROR: Invalid argument. Type rob!chars for a list of accepted arguments.")
+        elif char_1 == char_2:
+            await ctx.send("ERROR: Duplicate arguments. Provide two distinct arguments.")
+        else:
+            s = ""
+            titl = ("%s VS %s:" % (characters[char_1], characters[char_2]))
+            embed=discord.Embed(title=titl,description="")
+            total_games = (character_games_recorded[char_1][0][char_2])
+            embed.add_field(name="Total Games Played", value=total_games, inline=False)
+            wins_1 = (character_games_recorded[char_1][1][char_2])
+            embed.add_field(name="Wins for %s" % characters[char_1], value=wins_1, inline=False)
+            wins_2 = (character_games_recorded[char_2][1][char_1])
+            embed.add_field(name="Wins for %s" % characters[char_2], value=wins_2, inline=False)
+            winrate_1 = ((character_winrates[char_1][char_2]) * 100)
+            embed.add_field(name="%s Win Rate" % characters[char_1], value = "%.2f percent" % winrate_1, inline=False)
+            winrate_2 = ((character_winrates[char_2][char_1]) * 100)
+            embed.add_field(name="%s Win Rate" % characters[char_2], value = "%.2f percent" % winrate_2, inline=False)
+            await ctx.send(embed=embed)
+            
+
+@tasks.loop(seconds=1)
 async def update():
-    today = date.today()
-    new_datestr = str(today.strftime("v%Y.%m.%d"))
-    new_url = "https://github.com/smashdata/ThePlayerDatabase/releases/download/" + new_datestr + "/ultimate_player_database.zip"
-    while (new_url != url) and (requests.get(new_url, allow_redirects=True).status_code != 200):
-        print("testing", new_datestr)
-        today = today - timedelta(days=1)
+    now = datetime.now()
+    current_time = now.strftime("%H:%M:%S")
+    print("time:", current_time)
+    if current_time == "00:00:00":
+        today = date.today()
         new_datestr = str(today.strftime("v%Y.%m.%d"))
         new_url = "https://github.com/smashdata/ThePlayerDatabase/releases/download/" + new_datestr + "/ultimate_player_database.zip"
-    if new_url != url:
-        print("update found! restarting...")
-        os.execv(sys.executable, ['python'] + sys.argv)
-    else:
-        print("not yet...")
+        r = requests.get(new_url, allow_redirects=True)
+        while (new_url != url) and (r.status_code != 200):
+            print("testing", new_datestr)
+            today = today - timedelta(days=1)
+            new_datestr = str(today.strftime("v%Y.%m.%d"))
+            new_url = "https://github.com/smashdata/ThePlayerDatabase/releases/download/" + new_datestr + "/ultimate_player_database.zip"
+            r = requests.get(new_url, allow_redirects=True)
+        if new_url != url:
+            print("update found!")
+            os.execv(sys.executable, ['python'] + sys.argv)
+        else:
+            print("not yet...")
 
 client.run(TOKEN)
